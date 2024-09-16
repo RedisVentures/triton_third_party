@@ -24,10 +24,15 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-cmake_minimum_required(VERSION 3.17)
+cmake_minimum_required(VERSION 3.21)
 project(tritonthirdparty LANGUAGES C CXX)
 
-#
+##  set the timestamps of extracted contents to the time of extraction
+if(POLICY CMP0135)
+cmake_policy(SET CMP0135 NEW)
+endif()
+
+
 # ExternalProject Dependencies
 #
 # For each ExternalProject dependency we use PATCH_COMMAND to copy the
@@ -471,5 +476,47 @@ ExternalProject_Add(aws-sdk-cpp
     -DENABLE_TESTING:BOOL=OFF
     -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
     -DCMAKE_INSTALL_PREFIX:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/aws-sdk-cpp
+  PATCH_COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/tools/install_src.py --src <SOURCE_DIR> ${INSTALL_SRC_DEST_ARG}
+)
+
+find_program(MAKE_EXECUTABLE NAMES gmake make mingw32-make REQUIRED)
+
+#
+# Build hiredis
+#
+set(hiredis_LIBRARY ${CMAKE_INSTALL_PREFIX}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}hiredis${CMAKE_STATIC_LIBRARY_SUFFIX})
+ExternalProject_Add(hiredis
+  PREFIX hiredis
+  GIT_REPOSITORY "https://github.com/redis/hiredis.git"
+  GIT_TAG "v1.0.2"
+  SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/hiredis/src/hiredis"
+  EXCLUDE_FROM_ALL ON
+  CONFIGURE_COMMAND ""
+  BUILD_COMMAND ${MAKE_EXECUTABLE} static -C <SOURCE_DIR> PREFIX=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/hiredis
+  INSTALL_COMMAND ${MAKE_EXECUTABLE} install -C <SOURCE_DIR> PREFIX=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/hiredis
+  TEST_COMMAND ""
+  BUILD_BYPRODUCTS ${hiredis_LIBRARY}
+  PATCH_COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/tools/install_src.py --src <SOURCE_DIR> ${INSTALL_SRC_DEST_ARG}
+)
+
+#
+# Build redis-plus-plus
+#
+ExternalProject_Add(redis++
+  PREFIX redis++
+  GIT_REPOSITORY "https://github.com/sewenew/redis-plus-plus.git"
+  GIT_TAG "1.3.2"
+  SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/redis-plus-plus/src/sw/redis++"
+  EXCLUDE_FROM_ALL ON
+  CMAKE_CACHE_ARGS
+    ${_CMAKE_ARGS_CMAKE_TOOLCHAIN_FILE}
+    ${_CMAKE_ARGS_VCPKG_TARGET_TRIPLET}
+    -DCMAKE_BUILD_TYPE:STRING=Release
+    -DREDIS_PLUS_PLUS_BUILD_TEST:BOOL=OFF
+    -DREDIS_PLUS_PLUS_BUILD_SHARED:BOOL=OFF
+    -DCMAKE_CXX_STANDARD:STRING=17
+    -DCMAKE_PREFIX_PATH:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/hiredis
+    -DCMAKE_INSTALL_PREFIX:PATH=${TRITON_THIRD_PARTY_INSTALL_PREFIX}/redis++
+  DEPENDS hiredis
   PATCH_COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/tools/install_src.py --src <SOURCE_DIR> ${INSTALL_SRC_DEST_ARG}
 )
